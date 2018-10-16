@@ -15,18 +15,18 @@ if __name__ == '__main__':
             'Wise men make proverbs, but fools repeat them. -- Samuel Palmer (1805-80)']
 
 
-    timeout = 2 #send the next message if no response
+    timeout = 10 #send the next message if no response
     time_of_last_data = time.time()
 
     rdt = RDT.RDT('client', args.server, args.port)
     for msg_S in msg_L:
         print('Converting: '+msg_S)
-        rdt.rdt_1_0_send(msg_S)
+        rdt.rdt_3_0_send(msg_S)
 
         # try to receive message before timeout
         msg_S = None
         while msg_S == None:
-            msg_S = rdt.rdt_1_0_receive()
+            msg_S = rdt.rdt_3_0_receive()
             if msg_S is None:
                 if time_of_last_data + timeout < time.time():
                     break
