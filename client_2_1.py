@@ -17,7 +17,6 @@ if __name__ == '__main__':
 
     timeout = 2 #send the next message if no response
     time_of_last_data = time.time()
-
     rdt = RDT.RDT('client', args.server, args.port)
     for msg_S in msg_L:
         response = None

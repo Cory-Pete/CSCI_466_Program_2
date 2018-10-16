@@ -1,6 +1,7 @@
 import Network
 import argparse
 from time import sleep
+import time
 import hashlib
 
 
@@ -93,11 +94,16 @@ class RDT_2_1:
     def rdt_2_1_send(self, msg_S):
         p = Packet(self.seq_num, msg_S)
         current_seq_num = self.seq_num
+        timeout = 10 #close connection if no new data within 10 seconds
+
+
         #loop to ensure the correct uncorrupted package has been receieved by the server. As soon as it is received, it moves on to the next chunk
         while current_seq_num == self.seq_num:
+            time_of_last_data = time.time()
             self.network.udt_send(p.get_byte_S())
             response = None
-            while response == None:
+            #while response == None:#2.1
+            while response == None and time_of_last_data + timeout < time.time():
                 #setupt to wait for response from server
                 response = self.network.udt_receive()
             msg_length = int(response[:Packet.length_S_length])
@@ -108,7 +114,7 @@ class RDT_2_1:
                 #check to see if the reply is in the correct order, handles garbled ACK/NACK
                 if reply.seq_num < self.seq_num:
                     #garbled ack
-                    test = Packet(response_p.seq_num, "1")
+                    test = Packet(reply.seq_num, "1")
                     self.network.udt_send(test.get_byte_S())
                     print("Unknown Error")
                 elif reply.msg_S is "1":
