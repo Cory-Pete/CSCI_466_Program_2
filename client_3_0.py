@@ -15,11 +15,12 @@ if __name__ == '__main__':
             'Wise men make proverbs, but fools repeat them. -- Samuel Palmer (1805-80)']
 
 
-    timeout = 10 #send the next message if no response
+    timeout = 2 #send the next message if no response
     time_of_last_data = time.time()
 
     rdt = RDT.RDT('client', args.server, args.port)
     for msg_S in msg_L:
+        response = None
         print('Converting: '+msg_S)
         rdt.rdt_3_0_send(msg_S)
 
@@ -32,6 +33,7 @@ if __name__ == '__main__':
                     break
                 else:
                     continue
+
         time_of_last_data = time.time()
 
         #print the result

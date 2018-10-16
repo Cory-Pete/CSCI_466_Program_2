@@ -33,7 +33,7 @@ class Packet:
         #compute the checksum
         checksum = hashlib.md5((length_S+seq_num_S+self.msg_S).encode('utf-8'))
         checksum_S = checksum.hexdigest()
-        #compile into a string4
+        #compile into a string
         return length_S + seq_num_S + checksum_S + self.msg_S
 
 
@@ -93,28 +93,29 @@ class RDT_2_1:
     def rdt_2_1_send(self, msg_S):
         p = Packet(self.seq_num, msg_S)
         current_seq_num = self.seq_num
-
+        #loop to ensure the correct uncorrupted package has been receieved by the server. As soon as it is received, it moves on to the next chunk
         while current_seq_num == self.seq_num:
             self.network.udt_send(p.get_byte_S())
             response = None
             while response == None:
+                #setupt to wait for response from server
                 response = self.network.udt_receive()
             msg_length = int(response[:Packet.length_S_length])
             self.byte_buffer = response[msg_length:]
             #if the packet is not corrupted, check for ACK/NACK
             if not Packet.corrupt(response[:msg_length]):
-                response_p = Packet.from_byte_S(response[:msg_length])
+                reply = Packet.from_byte_S(response[:msg_length])
                 #check to see if the reply is in the correct order, handles garbled ACK/NACK
-                if response_p.seq_num < self.seq_num:
+                if reply.seq_num < self.seq_num:
                     #garbled ack
                     test = Packet(response_p.seq_num, "1")
                     self.network.udt_send(test.get_byte_S())
                     print("Unknown Error")
-                elif response_p.msg_S is "1":
+                elif reply.msg_S is "1":
                     # message was recieved, move to the next message
                     print("Message properly received")
                     self.seq_num += 1
-                elif response_p.msg_S is "0":
+                elif reply.msg_S is "0":
                     #did not receive message, retain sequence number and try again to send
                     self.byte_buffer = ''
                     print("Negative Acknowedlgement")
@@ -160,10 +161,6 @@ class RDT_2_1:
             self.byte_buffer = self.byte_buffer[length:]
             # if this was the last packet, will return on the next iteration
         return ret_S
-
-
-
-
 
 if __name__ == '__main__':
     parser =  argparse.ArgumentParser(description='RDT implementation.')

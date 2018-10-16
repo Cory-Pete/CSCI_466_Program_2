@@ -1,6 +1,5 @@
 import Network
 import argparse
-import time
 from time import sleep
 import hashlib
 
@@ -55,7 +54,7 @@ class Packet:
 
 class RDT_3_0:
     ## latest sequence number used in a packet
-    seq_num = 1
+    seq_num = 0
     ## buffer of bytes read from network
     byte_buffer = ''
 
@@ -91,53 +90,36 @@ class RDT_3_0:
             #if this was the last packet, will return on the next iteration
 
 
-    def rdt_2_1_send(self, msg_S):
-        pass
-
-    def rdt_2_1_receive(self):
-        pass
-
     def rdt_3_0_send(self, msg_S):
-        current_seq = 0
         p = Packet(self.seq_num, msg_S)
-        while self.seq_num == current_seq:
-            reponse = None
-            #initialize time for timeout to monitor packet loss
-            time_of_last_data = time.time()
-            #time before resending packet
-            #timeout = 2
-            #send initial ordered packet
+        current_seq_num = self.seq_num
+        #loop to ensure the correct uncorrupted package has been receieved by the server. As soon as it is received, it moves on to the next chunk
+        while current_seq_num == self.seq_num:
             self.network.udt_send(p.get_byte_S())
-            #transition to waiting for response stage
+            response = None
             while response == None:
                 response = self.network.udt_receive()
-                #monitor clock to account for packet loss if at any point during the ACK handshake data is lost
-               # if time_of_last_data + timeout < time.time():
-                #    print("Packet was lost to the abyss")
-                 #   break
-                #else:
-                 #   continue
             msg_length = int(response[:Packet.length_S_length])
-            self.byte_buffer = reponse[:msg_length]
-            #first check for corruption, if the returned packet is not corrupt then proceed to analyze the acknowledgements
-            if Packet.corrupt(response[:msg_length]) == False:
-                reply = Packet.from_byte_S(response[:msg_length])
-                #check to see if packets are behind current sequence
-                if reply.seq_num < self.seq_num:
-                    #resend a packet with the current sequence number
-                    self.network.udt_send(Packet(response[:msg_length]).get_byte_S(), "1")
-                    print("Server not recieving packets fast enough, reseting sequence nubmer")
-                elif reply.msg_S is "1":
-                    #properly acknowledged and recieved, increment seq number to move on to send the next message
+            self.byte_buffer = response[msg_length:]
+            #if the packet is not corrupted, check for ACK/NACK
+            if not Packet.corrupt(response[:msg_length]):
+                response_p = Packet.from_byte_S(response[:msg_length])
+                #check to see if the reply is in the correct order, handles garbled ACK/NACK
+                if response_p.seq_num < self.seq_num:
+                    #garbled ack
+                    test = Packet(response_p.seq_num, "1")
+                    self.network.udt_send(test.get_byte_S())
+                    print("Unknown Error")
+                elif response_p.msg_S is "1":
+                    # message was recieved, move to the next message
+                    print("Message properly received")
                     self.seq_num += 1
-                    print("properly sent and what not, move to send the next chunk by incrementing the sequence")
-                elif reply.msg_S is "0":
-                    #negative acknowledgement, clear the buffer and try to send the same chunk again
-                    self.byte_buffer = None
+                elif response_p.msg_S is "0":
+                    #did not receive message, retain sequence number and try again to send
+                    self.byte_buffer = ''
+                    print("Negative Acknowedlgement")
             else:
-                print("Packet was corrupted")
-                self.byte_buffer = None
-
+                self.byte_buffer = ''
 
     def rdt_3_0_receive(self):
         ret_S = None
@@ -179,7 +161,6 @@ class RDT_3_0:
             # if this was the last packet, will return on the next iteration
         return ret_S
 
-
 if __name__ == '__main__':
     parser =  argparse.ArgumentParser(description='RDT implementation.')
     parser.add_argument('role', help='Role is either client or server.', choices=['client', 'server'])
@@ -190,13 +171,13 @@ if __name__ == '__main__':
     rdt = RDT_3_0(args.role, args.server, args.port)
     if args.role == 'client':
         rdt.rdt_3_0_send('MSG_FROM_CLIENT')
-        sleep(5)
+        sleep(2)
         print(rdt.rdt_3_0_receive())
         rdt.disconnect()
 
 
     else:
-        sleep(5)
+        sleep(1)
         print(rdt.rdt_3_0_receive())
         rdt.rdt_3_0_send('MSG_FROM_SERVER')
 rdt.disconnect()
